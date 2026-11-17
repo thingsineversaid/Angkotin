@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#142b4a">
+  <title>ANGKOTIN — Temukan Angkot di Medan</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{--navy:#142b4a;--blue:#2563eb;--pale:#edf3ff;--green:#15966a;--ink:#172033;--muted:#64748b;--line:#e4eaf2;--bg:#f4f7fb}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+    header{background:var(--navy);color:#fff;padding:17px max(20px,calc((100% - 1200px)/2));display:flex;align-items:center;justify-content:space-between;gap:15px}
+    .brand{font-weight:850;font-size:22px;letter-spacing:.4px}.brand-mark{display:inline-grid;place-items:center;background:#fff;color:var(--navy);width:38px;height:38px;border-radius:11px;margin-right:9px}
+    header small{color:#d3deec}
+    main{max-width:1200px;margin:28px auto;padding:0 18px}
+    h1{margin:0 0 8px;color:var(--navy);font-size:clamp(25px,4vw,36px)}
+    .lead{margin:0 0 21px;color:var(--muted);line-height:1.55}
+    .layout{display:grid;grid-template-columns:355px minmax(0,1fr);gap:17px;align-items:stretch}
+    .panel,.map-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 25px #142b4a0a;overflow:hidden}
+    .panel{padding:19px}
+    h2{font-size:18px;color:var(--navy);margin:0 0 14px}
+    label{display:block;font-size:13px;font-weight:750;margin:14px 0 7px}
+    input,select{width:100%;border:1px solid #d7dfeb;border-radius:10px;padding:12px 13px;font:inherit;background:#fff;color:var(--ink);outline:none}
+    input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px #2563eb18}
+    button{font:inherit;font-weight:750;border:0;border-radius:10px;padding:12px;cursor:pointer}
+    button:focus-visible{outline:3px solid #93b4ff;outline-offset:2px}
+    .primary{width:100%;background:var(--blue);color:#fff;margin-top:12px}
+    .secondary{width:100%;background:var(--pale);color:var(--navy);margin-top:9px}
+    .route-list{display:grid;gap:8px;margin-top:12px;max-height:300px;overflow:auto}
+    .route-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#fff;border:1px solid var(--line);padding:10px 11px}
+    .route-item.selected{border:2px solid var(--blue);background:#f4f7ff;padding:9px 10px}
+    .route-item strong{display:block;color:var(--navy)}
+    .route-item small{display:block;color:var(--muted);font-weight:450;margin-top:3px;line-height:1.35}
+    .route-tag{font-size:10px;background:#fff4df;color:#885a16;border-radius:20px;padding:4px 7px;white-space:nowrap}
+    .info{background:#f7f9fc;border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:15px;font-size:12px;color:var(--muted);line-height:1.55}
+    .info strong{display:block;color:var(--ink);font-size:13px;margin-bottom:4px}
+    .warning{background:#fff8e9;border:1px solid #f2dfb8;border-radius:11px;padding:11px 12px;color:#805519;font-size:11px;line-height:1.5;margin-top:12px}
+    .map-head{padding:12px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--navy);font-size:13px;font-weight:750}
+    .legend{font-size:11px;color:var(--muted);font-weight:500}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 8px}
+    #map{height:620px;width:100%}
+    .vehicle-icon{width:31px;height:31px;border:2px solid #fff;border-radius:50% 50% 50% 5px;display:grid;place-items:center;transform:rotate(-45deg);box-shadow:0 2px 8px #0004}
+    .vehicle-icon span{transform:rotate(45deg);font-size:16px}
+    .leaflet-popup-content{font-family:inherit;line-height:1.5}
+    .empty{font-size:12px;color:var(--muted);padding:9px 2px}
+    footer{text-align:center;color:#8994a5;font-size:11px;padding:25px 15px 35px}
+    @media(max-width:850px){header{padding:14px 18px}header small{font-size:10px}.layout{grid-template-columns:1fr}#map{height:450px}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="brand-mark">🚌</span>ANGKOTIN</div>
+  <small>Temukan angkot di Kota Medan</small>
+</header>
+
+<main>
+  <h1>Angkot yang kamu cari ada di mana?</h1>
+  <p class="lead">Cari berdasarkan nomor dan operator, lihat informasi trayek, lalu jelajahi peta simulasi angkot di Kota Medan.</p>
+
+  <div class="layout">
+    <aside class="panel">
+      <h2>Cari angkot</h2>
+      <label for="search">Nomor angkot atau operator</label>
+      <input id="search" type="search" placeholder="Contoh: 06, 103, KPUM, RMC">
+      <div id="routeList" class="route-list"></div>
+
+      <div class="info" id="routeInfo" aria-live="polite">
+        <strong>Pilih salah satu angkot</strong>
+        Informasi operator dan rute akan muncul di sini.
+      </div>
+
+      <button class="primary" id="showRoute">Tampilkan angkot di peta</button>
+      <button class="secondary" id="locateMe">◎ Gunakan lokasi saya</button>
+      <div class="info" id="nearestInfo" aria-live="polite">
+        <strong>Lokasi kamu belum diketahui</strong>
+        Aktifkan lokasi untuk melihat perkiraan jarak ke titik angkot simulasi terdekat.
+      </div>
+      <div class="warning"><strong>Catatan prototipe:</strong> posisi kendaraan bergerak secara simulasi, bukan GPS angkot sungguhan. Daftar trayek awal juga perlu diverifikasi kepada Dishub/operator sebelum dianggap sebagai data resmi.</div>
+    </aside>
+
+    <section class="map-card">
+      <div class="map-head">
+        <span>Peta Kota Medan</span>
+        <span class="legend"><i class="dot" style="background:#2563eb"></i>Angkot simulasi <i class="dot" style="background:#15966a"></i>Lokasi kamu</span>
+      </div>
+      <div id="map" aria-label="Peta interaktif Kota Medan"></div>
+    </section>
+  </div>
+</main>
+<footer>ANGKOTIN · Proyek prototipe transportasi publik Kota Medan</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+  ANGKOTIN — semua kode aplikasi berada dalam satu file index.html.
+  Daftar di bawah adalah data awal untuk demonstrasi, bukan data resmi lengkap.
+  Verifikasi operator, nomor, rute, warna, dan status aktif sebelum dipublikasikan.
+*/
+const ROUTES = [
+  {id:"KPUM-06",operator:"KPUM",number:"06",route:"Terminal Amplas – Terminal Pinang Baris",color:"#2563eb",verified:false},
+  {id:"KPUM-07",operator:"KPUM",number:"07",route:"Sisingamangaraja – Letda Sujono",color:"#2563eb",verified:false},
+  {id:"KPUM-32",operator:"KPUM",number:"32",route:"Terminal Pinang Baris – Terminal Belawan",color:"#2563eb",verified:false},
+  {id:"KPUM-46",operator:"KPUM",number:"46",route:"Tanjung Selamat – Letda Sujono",color:"#2563eb",verified:false},
+  {id:"KPUM-63",operator:"KPUM",number:"63",route:"Perumnas Mandala – Terminal Pinang Baris",color:"#2563eb",verified:false},
+  {id:"KPUM-64",operator:"KPUM",number:"64",route:"Terminal Amplas – Terminal Pinang Baris",color:"#2563eb",verified:false},
+  {id:"RMC-103",operator:"RMC",number:"103",route:"UNIMED – Jalan Jamin Ginting",color:"#ed8b26",verified:false},
+  {id:"RMC-121",operator:"RMC",number:"121",route:"Perumnas Simalingkar – William Iskandar",color:"#ed8b26",verified:false},
+  {id:"MORINA-81",operator:"Morina",number:"81",route:"Sisingamangaraja – Amplas – Belawan",color:"#15966a",verified:false},
+  {id:"MORINA-121",operator:"Morina",number:"121",route:"Sisingamangaraja – Amplas – Belawan via Adam Malik",color:"#15966a",verified:false}
+];
+
+// Pusat peta di Kota Medan. Koordinat kendaraan berikut hanya titik demo.
+const map = L.map("map").setView([3.5905,98.6738],12);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+  maxZoom:19,
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+
+const demoVehicles = [
+  {id:"D-01",routeId:"KPUM-06",lat:3.5896,lng:98.6738,step:0.00010},
+  {id:"D-02",routeId:"KPUM-06",lat:3.5792,lng:98.6625,step:0.00008},
+  {id:"D-03",routeId:"KPUM-07",lat:3.5960,lng:98.6810,step:0.00007},
+  {id:"D-04",routeId:"KPUM-32",lat:3.5845,lng:98.6890,step:0.00009},
+  {id:"D-05",routeId:"RMC-103",lat:3.6010,lng:98.6680,step:0.00006},
+  {id:"D-06",routeId:"RMC-121",lat:3.5735,lng:98.6785,step:0.00008},
+  {id:"D-07",routeId:"MORINA-81",lat:3.6070,lng:98.6820,step:0.00007},
+  {id:"D-08",routeId:"MORINA-121",lat:3.5810,lng:98.6550,step:0.00006}
+];
+
+let selectedRoute = ROUTES[0];
+let userLocation = null;
+let userMarker = null;
+const markers = new Map();
+const $ = id => document.getElementById(id);
+
+function vehicleIcon(color){
+  return L.divIcon({
+    className:"",
+    html:`<div class="vehicle-icon" style="background:${color}"><span>🚌</span></div>`,
+    iconSize:[31,31],iconAnchor:[15,27],popupAnchor:[0,-25]
+  });
+}
+function distanceKm(a,b){
+  const R=6371,rad=Math.PI/180;
+  const dLat=(b.lat-a.lat)*rad,dLng=(b.lng-a.lng)*rad;
+  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLng/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function renderRouteList(){
+  const q=$("search").value.trim().toLowerCase();
+  const found=ROUTES.filter(r=>(r.number+" "+r.operator+" "+r.route).toLowerCase().includes(q));
+  $("routeList").innerHTML="";
+  if(!found.length){
+    $("routeList").innerHTML='<div class="empty">Nomor atau operator belum ditemukan dalam daftar demo.</div>';
+    return;
+  }
+  found.forEach(r=>{
+    const button=document.createElement("button");
+    button.className="route-item"+(selectedRoute.id===r.id?" selected":"");
+    button.innerHTML=`<span><strong>${r.operator} · ${r.number}</strong><small>${r.route}</small></span><span class="route-tag">Demo</span>`;
+    button.addEventListener("click",()=>selectRoute(r));
+    $("routeList").appendChild(button);
+  });
+}
+function selectRoute(route){
+  selectedRoute=route;
+  renderRouteList();
+  $("routeInfo").innerHTML=`<strong>${route.operator} · Angkot ${route.number}</strong>Rute contoh: ${route.route}<br><span style="color:#9a671d">Status data: perlu verifikasi.</span>`;
+  renderVehicles();
+  updateNearest();
+}
+function renderVehicles(){
+  const visible=demoVehicles.filter(v=>v.routeId===selectedRoute.id);
+  const visibleIds=new Set(visible.map(v=>v.id));
+  for(const [id,marker] of markers){
+    if(!visibleIds.has(id)){map.removeLayer(marker);markers.delete(id);}
+  }
+  visible.forEach(v=>{
+    const popup=`<strong>${selectedRoute.operator} · ${selectedRoute.number}</strong><br>Kendaraan demo: ${v.id}<br>Posisi simulasi, bukan GPS sungguhan.`;
+    if(markers.has(v.id)){
+      markers.get(v.id).setLatLng([v.lat,v.lng]).setPopupContent(popup);
+    }else{
+      const marker=L.marker([v.lat,v.lng],{icon:vehicleIcon(selectedRoute.color)}).addTo(map).bindPopup(popup);
+      markers.set(v.id,marker);
+    }
+  });
+}
+function updateNearest(){
+  if(!userLocation){
+    $("nearestInfo").innerHTML="<strong>Lokasi kamu belum diketahui</strong>Tekan tombol Gunakan lokasi saya untuk melihat perkiraan jarak.";
+    return;
+  }
+  const candidates=demoVehicles.filter(v=>v.routeId===selectedRoute.id);
+  if(!candidates.length){
+    $("nearestInfo").innerHTML="<strong>Belum ada titik demo</strong>Belum ada kendaraan simulasi untuk nomor ini.";
+    return;
+  }
+  const nearest=candidates.map(v=>({v,km:distanceKm(userLocation,v)})).sort((a,b)=>a.km-b.km)[0];
+  const roughMinutes=Math.max(1,Math.round(nearest.km/20*60));
+  $("nearestInfo").innerHTML=`<strong>Titik demo terdekat: ${nearest.v.id}</strong>Jarak garis lurus sekitar ${nearest.km.toFixed(2)} km. Perkiraan ${roughMinutes} menit menggunakan asumsi 20 km/jam. Ini bukan estimasi kedatangan nyata dan tidak memperhitungkan jalan atau kemacetan.`;
+}
+$("search").addEventListener("input",renderRouteList);
+$("showRoute").addEventListener("click",()=>{
+  renderVehicles();
+  const group=demoVehicles.filter(v=>v.routeId===selectedRoute.id);
+  if(group.length){
+    const bounds=L.latLngBounds(group.map(v=>[v.lat,v.lng]));
+    if(userLocation)bounds.extend([userLocation.lat,userLocation.lng]);
+    map.fitBounds(bounds.pad(.35));
+  }
+  updateNearest();
+});
+$("locateMe").addEventListener("click",()=>{
+  if(!navigator.geolocation){
+    $("nearestInfo").innerHTML="<strong>GPS tidak didukung</strong>Browser ini tidak menyediakan fitur lokasi.";
+    return;
+  }
+  $("nearestInfo").innerHTML="<strong>Meminta izin lokasi…</strong>Izinkan akses lokasi pada browser.";
+  navigator.geolocation.getCurrentPosition(position=>{
+    userLocation={lat:position.coords.latitude,lng:position.coords.longitude};
+    const point=[userLocation.lat,userLocation.lng];
+    if(userMarker)userMarker.setLatLng(point);
+    else userMarker=L.circleMarker(point,{radius:9,color:"#fff",weight:3,fillColor:"#15966a",fillOpacity:1}).addTo(map).bindPopup("Lokasi kamu");
+    map.setView(point,14);
+    updateNearest();
+  },error=>{
+    const message=error.code===1?"Izin lokasi ditolak. Aktifkan izin lokasi untuk website ini.":"Lokasi tidak berhasil diperoleh. Pastikan GPS aktif lalu coba lagi.";
+    $("nearestInfo").innerHTML=`<strong>Lokasi belum tersedia</strong>${message}`;
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+});
+
+// Gerakan marker demo setiap 5 detik agar interaksi peta terlihat.
+setInterval(()=>{
+  demoVehicles.forEach(v=>{
+    v.lng+=v.step;
+    if(v.lng>98.700)v.lng=98.650;
+  });
+  renderVehicles();
+  updateNearest();
+},5000);
+
+renderRouteList();
+selectRoute(selectedRoute);
+</script>
+</body>
+</html>
